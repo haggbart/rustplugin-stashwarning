@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Oxide.Core.Libraries.Covalence;
 using Oxide.Core.Plugins;
@@ -6,23 +6,24 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Stash Warning", "haggbart", "1.0.0")]
+    [Info("Stash Warning", "haggbart", "1.2.0")]
     [Description("Logs suspicious stash activity and reports to admins ingame and on discord")]
     class StashWarning : RustPlugin
     {
         [PluginReference] Plugin DiscordMessages;
         
-        private const string DISCORD_ENABLED = "Enable Discord";
         private const string WEBHOOK_URL = "Webhook URL";
         private const string MESSAGE = "Message";
+        private const string IGNORE_SAME_TEAM = "Ignore players in the same team";
         
-        private string webhookURL;
-        private bool discordEnabled;
+        private string _webhookUrl;
+        private bool _discordEnabled;
         
         protected override void LoadDefaultConfig()
         {
             Puts("Creating a new configuration file");
             Config[WEBHOOK_URL] = "";
+            Config[IGNORE_SAME_TEAM] = true;
         }
         
         protected override void LoadDefaultMessages()
@@ -35,15 +36,16 @@ namespace Oxide.Plugins
         
         private void Init()
         {
-            webhookURL = Config[WEBHOOK_URL].ToString();
-            if (!string.IsNullOrEmpty(webhookURL))
+            _webhookUrl = Config[WEBHOOK_URL].ToString();
+            if (!string.IsNullOrEmpty(_webhookUrl))
             {
-                discordEnabled = true;
+                _discordEnabled = true;
             }
         }
         
         private void CanSeeStash(BasePlayer player, StashContainer stash)
         {
+            if (stash.inventory.itemList.Count == 0) return;
             if (player.userID == stash.OwnerID || IsTeamMember(player, stash)) return;
             var iPlayerOwner = covalence.Players.FindPlayerById(stash.OwnerID.ToString());
             var formattedMessage = GetFormattedMessage(player, iPlayerOwner);
@@ -51,13 +53,14 @@ namespace Oxide.Plugins
             {
                 SendReply(target, GetFormattedMessage(player, iPlayerOwner, target));
             }
-            LogToFile(string.Empty, formattedMessage, this, true); 
-            if (discordEnabled)
-                DiscordMessages?.Call("API_SendTextMessage", webhookURL, formattedMessage);
+            LogToFile(string.Empty, formattedMessage, this); 
+            if (_discordEnabled)
+                DiscordMessages?.Call("API_SendTextMessage", _webhookUrl, formattedMessage);
         }
 
-        private static bool IsTeamMember(BasePlayer player, StashContainer stash)
+        private bool IsTeamMember(BasePlayer player, StashContainer stash)
         {
+            if ((bool)Config[IGNORE_SAME_TEAM]) return false;
             var team = RelationshipManager.Instance.FindTeam(player.currentTeam);
             if (team == null) return false;
             foreach (var member in team.members)

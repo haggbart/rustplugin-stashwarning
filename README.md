@@ -6,6 +6,11 @@ Settings:
 * Webhook URL (leave empty to disable discord feature)
 * Ignore players in the same team -> true
 
-**Delete old config file (oxide/config/StashWarning.json) when updating to 1.2.0**
+
+## Chat Commands
+
+- `/sw` - Teleport to last warning.
+
 
 ## Localization
+

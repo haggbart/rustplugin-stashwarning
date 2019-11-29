@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Oxide.Core.Libraries.Covalence;
 using Oxide.Core.Plugins;
@@ -6,18 +7,20 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Stash Warning", "haggbart", "1.2.0")]
+    [Info("Stash Warning", "haggbart", "1.3.1")]
     [Description("Logs suspicious stash activity and reports to admins ingame and on discord")]
     class StashWarning : RustPlugin
     {
         [PluginReference] Plugin DiscordMessages;
-        
         private const string WEBHOOK_URL = "Webhook URL";
-        private const string MESSAGE = "Message";
+        private const string MESSAGE = "Warning message";
+        private const string NO_RECENT_WARNING = "No recent warning";
         private const string IGNORE_SAME_TEAM = "Ignore players in the same team";
         
         private string _webhookUrl;
         private bool _discordEnabled;
+        private Vector3 position;
+        private string message;
         
         protected override void LoadDefaultConfig()
         {
@@ -30,7 +33,8 @@ namespace Oxide.Plugins
         {
             lang.RegisterMessages(new Dictionary<string, string>
             {
-                [MESSAGE] = "{0} ({1}) found a stash that belongs to {2} ({3}) in {4}"
+                [MESSAGE] = "{0} ({1}) found a stash that belongs to {2} ({3}) in {4} {5}.",
+                [NO_RECENT_WARNING] = "No recent warning. No location to teleport to."
             }, this);
         }
         
@@ -47,52 +51,55 @@ namespace Oxide.Plugins
         {
             if (stash.inventory.itemList.Count == 0) return;
             if (player.userID == stash.OwnerID || IsTeamMember(player, stash)) return;
-            var iPlayerOwner = covalence.Players.FindPlayerById(stash.OwnerID.ToString());
-            var formattedMessage = GetFormattedMessage(player, iPlayerOwner);
-            foreach (var target in BasePlayer.activePlayerList.Where(x => x.IsAdmin))
+            IPlayer iPlayerOwner = covalence.Players.FindPlayerById(stash.OwnerID.ToString());
+            addWarning(player, iPlayerOwner);
+            foreach (BasePlayer target in BasePlayer.activePlayerList.Where(x => x.IsAdmin))
             {
-                SendReply(target, GetFormattedMessage(player, iPlayerOwner, target));
+                SendReply(target, message, player);
             }
-            LogToFile(string.Empty, formattedMessage, this); 
+            LogToFile(string.Empty, message, this); 
             if (_discordEnabled)
-                DiscordMessages?.Call("API_SendTextMessage", _webhookUrl, formattedMessage);
+                DiscordMessages?.Call("API_SendTextMessage", _webhookUrl, message);
         }
 
         private bool IsTeamMember(BasePlayer player, StashContainer stash)
         {
             if ((bool)Config[IGNORE_SAME_TEAM]) return false;
-            var team = RelationshipManager.Instance.FindTeam(player.currentTeam);
-            if (team == null) return false;
-            foreach (var member in team.members)
-            {
-                if (member == player.userID)
-                {
-                    continue;
-                }
-                if (stash.OwnerID == member)
-                {
-                    return true;
-                }
-            }
-            return false;
+            RelationshipManager.PlayerTeam team = RelationshipManager.Instance.FindTeam(player.currentTeam);
+            return team != null && team.members.Where(member => member != player.userID).Any(member => stash.OwnerID == member);
         }
 
-        private string GetFormattedMessage(BasePlayer player, IPlayer iPlayerOwner, BasePlayer target = null)
+        private void addWarning(BasePlayer player, IPlayer iPlayerOwner, BasePlayer target = null)
         {
-            var message = target == null ? lang.GetMessage(string.Format(MESSAGE), this) : lang.GetMessage(string.Format(MESSAGE), this, target.UserIDString);
-            return string.Format(message, player.displayName, player.userID, iPlayerOwner.Name, iPlayerOwner.Id, GridReference(player.transform.position));
+            message = target == null ? lang.GetMessage(string.Format(MESSAGE), this) : lang.GetMessage(string.Format(MESSAGE), this, target.UserIDString);
+            message = string.Format(message, player.displayName, player.userID, iPlayerOwner.Name, iPlayerOwner.Id,
+                GridReference(position), position);
+            position = player.transform.position;
         }
 
         private static string GridReference(Vector3 pos)
         {
-            var worldSize = ConVar.Server.worldsize;
+            int worldSize = ConVar.Server.worldsize;
             const float scale = 150f;
-            var x = pos.x + worldSize/2f;
-            var z = pos.z + worldSize/2f;
+            float x = pos.x + worldSize/2f;
+            float z = pos.z + worldSize/2f;
             var lat = (int)(x / scale);
             var latChar = (char)('A' + lat);
             var lon = (int)(worldSize/scale - z/scale);
             return $"{latChar}{lon}";
+        }
+
+        [ChatCommand("sw")] 
+        void TeleportLast(BasePlayer player)
+        {
+            if (!player.IsAdmin || !player.IsAlive()) return;
+            if (message == null)
+            {
+                SendReply(player, lang.GetMessage(NO_RECENT_WARNING, this, player.UserIDString));
+                return;
+            }
+            SendReply(player, message);
+            player.Teleport(position);
         }
     }
 }

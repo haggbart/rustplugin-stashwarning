@@ -7,9 +7,9 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Stash Warning", "haggbart", "1.3.1")]
+    [Info("Stash Warning", "haggbart", "1.3.2")]
     [Description("Logs suspicious stash activity and reports to admins ingame and on discord")]
-    class StashWarning : RustPlugin
+    internal class StashWarning : RustPlugin
     {
         [PluginReference] Plugin DiscordMessages;
         private const string WEBHOOK_URL = "Webhook URL";
@@ -52,7 +52,7 @@ namespace Oxide.Plugins
             if (stash.inventory.itemList.Count == 0) return;
             if (player.userID == stash.OwnerID || IsTeamMember(player, stash)) return;
             IPlayer iPlayerOwner = covalence.Players.FindPlayerById(stash.OwnerID.ToString());
-            addWarning(player, iPlayerOwner);
+            AddWarning(player, iPlayerOwner);
             foreach (BasePlayer target in BasePlayer.activePlayerList.Where(x => x.IsAdmin))
             {
                 SendReply(target, message, player);
@@ -69,12 +69,12 @@ namespace Oxide.Plugins
             return team != null && team.members.Where(member => member != player.userID).Any(member => stash.OwnerID == member);
         }
 
-        private void addWarning(BasePlayer player, IPlayer iPlayerOwner, BasePlayer target = null)
+        private void AddWarning(BasePlayer player, IPlayer iPlayerOwner, BasePlayer target = null)
         {
+            position = player.transform.position;
             message = target == null ? lang.GetMessage(string.Format(MESSAGE), this) : lang.GetMessage(string.Format(MESSAGE), this, target.UserIDString);
             message = string.Format(message, player.displayName, player.userID, iPlayerOwner.Name, iPlayerOwner.Id,
                 GridReference(position), position);
-            position = player.transform.position;
         }
 
         private static string GridReference(Vector3 pos)
@@ -90,7 +90,7 @@ namespace Oxide.Plugins
         }
 
         [ChatCommand("sw")] 
-        void TeleportLast(BasePlayer player)
+        private void TeleportLast(BasePlayer player)
         {
             if (!player.IsAdmin || !player.IsAlive()) return;
             if (message == null)

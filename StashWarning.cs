@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Stash Warning", "haggbart", "1.3.2")]
+    [Info("Stash Warning", "haggbart", "1.3.3")]
     [Description("Logs suspicious stash activity and reports to admins ingame and on discord")]
     internal class StashWarning : RustPlugin
     {
@@ -49,8 +49,18 @@ namespace Oxide.Plugins
         
         private void CanSeeStash(BasePlayer player, StashContainer stash)
         {
-            if (stash.inventory.itemList.Count == 0) return;
-            if (player.userID == stash.OwnerID || IsTeamMember(player, stash)) return;
+            if (stash.inventory.itemList.Count == 0 || player.userID == stash.OwnerID) return;
+
+            
+            if ((bool) Config[IGNORE_SAME_TEAM] && IsTeamMember(player, stash))
+            {
+                if (player.IsAdmin)
+                {
+                    SendReply(player, "sameteam: " + IsTeamMember(player, stash));
+                }
+                return;
+            }
+            
             IPlayer iPlayerOwner = covalence.Players.FindPlayerById(stash.OwnerID.ToString());
             AddWarning(player, iPlayerOwner);
             foreach (BasePlayer target in BasePlayer.activePlayerList.Where(x => x.IsAdmin))
@@ -64,15 +74,22 @@ namespace Oxide.Plugins
 
         private bool IsTeamMember(BasePlayer player, StashContainer stash)
         {
-            if ((bool)Config[IGNORE_SAME_TEAM]) return false;
-            RelationshipManager.PlayerTeam team = RelationshipManager.Instance.FindTeam(player.currentTeam);
-            return team != null && team.members.Where(member => member != player.userID).Any(member => stash.OwnerID == member);
+            if (!(bool)Config[IGNORE_SAME_TEAM]) return false;
+            RelationshipManager.PlayerTeam team = RelationshipManager.Instance.FindPlayersTeam(stash.OwnerID);
+            
+            if (team == null)
+            {
+                return false;
+            }
+            
+            return team.teamID == player.currentTeam;
         }
 
         private void AddWarning(BasePlayer player, IPlayer iPlayerOwner, BasePlayer target = null)
         {
             position = player.transform.position;
-            message = target == null ? lang.GetMessage(string.Format(MESSAGE), this) : lang.GetMessage(string.Format(MESSAGE), this, target.UserIDString);
+            message = target == null ? lang.GetMessage(string.Format(MESSAGE), this) : 
+                lang.GetMessage(string.Format(MESSAGE), this, target.UserIDString);
             message = string.Format(message, player.displayName, player.userID, iPlayerOwner.Name, iPlayerOwner.Id,
                 GridReference(position), position);
         }

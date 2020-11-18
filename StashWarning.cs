@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Oxide.Core.Libraries.Covalence;
@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Stash Warning", "haggbart", "1.3.3")]
+    [Info("Stash Warning", "haggbart", "1.3.4")]
     [Description("Logs suspicious stash activity and reports to admins ingame and on discord")]
     internal class StashWarning : RustPlugin
     {
@@ -88,10 +88,8 @@ namespace Oxide.Plugins
         private void AddWarning(BasePlayer player, IPlayer iPlayerOwner, BasePlayer target = null)
         {
             position = player.transform.position;
-            message = target == null ? lang.GetMessage(string.Format(MESSAGE), this) : 
-                lang.GetMessage(string.Format(MESSAGE), this, target.UserIDString);
-            message = string.Format(message, player.displayName, player.userID, iPlayerOwner.Name, iPlayerOwner.Id,
-                GridReference(position), position);
+            message = target == null ? lang.GetMessage(string.Format(MESSAGE), this) : lang.GetMessage(string.Format(MESSAGE), this, target.UserIDString);
+            message = string.Format(message, player.displayName, player.userID, iPlayerOwner?.Name ?? "Unknown", iPlayerOwner?.Id ?? "Unknown", GridReference(position), position);
         }
 
         private static string GridReference(Vector3 pos)
@@ -120,5 +118,3 @@ namespace Oxide.Plugins
         }
     }
 }
-
-

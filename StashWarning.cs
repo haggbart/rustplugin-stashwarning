@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Stash Warning", "haggbart", "1.3.4")]
+    [Info("Stash Warning", "haggbart", "1.3.5")]
     [Description("Logs suspicious stash activity and reports to admins ingame and on discord")]
     internal class StashWarning : RustPlugin
     {
@@ -75,7 +75,7 @@ namespace Oxide.Plugins
         private bool IsTeamMember(BasePlayer player, StashContainer stash)
         {
             if (!(bool)Config[IGNORE_SAME_TEAM]) return false;
-            RelationshipManager.PlayerTeam team = RelationshipManager.Instance.FindPlayersTeam(stash.OwnerID);
+            RelationshipManager.PlayerTeam team = RelationshipManager.ServerInstance.FindPlayersTeam(stash.OwnerID);
             
             if (team == null)
             {
